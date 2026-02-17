@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Firmware Flasher</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>IoT Firmware Flasher</h1>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-btn active" onclick="switchTab('esp32')">ESP32</button>
+            <button class="tab-btn" onclick="switchTab('bw16')">BW16 (RTL8720DN)</button>
+        </nav>
+
+        <div id="esp32-section" class="section active">
+            <h2>ESP32 Flasher</h2>
+            <div class="controls">
+                <button id="esp-connect" class="btn primary">Connect</button>
+                <div class="file-group">
+                    <label for="esp-file">Firmware (.bin):</label>
+                    <input type="file" id="esp-file" accept=".bin">
+                </div>
+                <div class="input-group">
+                    <label for="esp-offset">Flash Address (Hex):</label>
+                    <input type="text" id="esp-offset" value="0x0" placeholder="0x0">
+                </div>
+                <button id="esp-flash" class="btn success" disabled>Flash Firmware</button>
+            </div>
+            <div class="status">
+                <div id="esp-progress-container" class="progress-container hidden">
+                    <div id="esp-progress-bar" class="progress-bar">0%</div>
+                </div>
+            </div>
+            <div id="esp-console" class="console"></div>
+        </div>
+
+        <div id="bw16-section" class="section">
+            <h2>BW16 (RTL8720DN) Tool</h2>
+            <div class="alert warning">
+                <strong>Warning:</strong> Browser-based flashing for BW16 is experimental.
+                This tool provides a raw serial connection. The official AmebaD Image Tool
+                uses a specific handshake protocol which may not be fully replicated here.
+                Use this for serial logging or raw binary uploads if you know what you are doing.
+            </div>
+            <div class="controls">
+                <button id="bw16-connect" class="btn primary">Connect</button>
+                <div class="file-group">
+                    <label for="bw16-file">Firmware (.bin):</label>
+                    <input type="file" id="bw16-file" accept=".bin">
+                </div>
+                <button id="bw16-upload" class="btn success" disabled>Upload (Raw)</button>
+            </div>
+            <div id="bw16-console" class="console"></div>
+        </div>
+    </div>
+
+    <script src="lib/crypto-js.min.js"></script>
+    <script type="module" src="script.js"></script>
+</body>
+</html>
