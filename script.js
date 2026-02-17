@@ -38,13 +38,36 @@ document.getElementById('esp-connect').addEventListener('click', async () => {
     }
 
     try {
-        const port = await navigator.serial.requestPort();
-        espTransport = new Transport(port);
-        espLoader = new ESPLoader(espTransport, 115200, new EspLoaderTerminal({
-            clean: () => document.getElementById('esp-console').textContent = "",
-            writeLine: (data) => log(data, 'esp-console'),
-            write: (data) => log(data, 'esp-console')
-        }));
+        // Filter for common ESP32 USB-to-Serial adapters (optional, helps user select correct port)
+        const filters = [
+            { usbVendorId: 0x10c4, usbProductId: 0xea60 }, // CP210x
+            { usbVendorId: 0x1a86, usbProductId: 0x7523 }, // CH340
+            { usbVendorId: 0x303a, usbProductId: 0x1001 }, // Espressif USB
+            { usbVendorId: 0x303a, usbProductId: 0x8002 }, // Espressif USB
+        ];
+
+        const port = await navigator.serial.requestPort({ filters });
+
+        if (!port) {
+            log("No port selected.", 'esp-console');
+            return;
+        }
+
+        log("Port selected.", 'esp-console');
+        espTransport = new Transport(port, true); // Create Transport instance, enable tracing
+
+        // Debug Transport instance
+        console.log("Transport:", espTransport);
+
+        espLoader = new ESPLoader({
+            transport: espTransport,
+            baudrate: 115200,
+            terminal: new EspLoaderTerminal({
+                clean: () => document.getElementById('esp-console').textContent = "",
+                writeLine: (data) => log(data, 'esp-console'),
+                write: (data) => log(data, 'esp-console')
+            })
+        });
 
         log("Connecting...", 'esp-console');
         await espLoader.main_fn();
