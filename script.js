@@ -62,6 +62,8 @@ document.getElementById('esp-connect').addEventListener('click', async () => {
         espLoader = new ESPLoader({
             transport: espTransport,
             baudrate: 115200,
+            romBaudrate: 115200, // Try to sync at lower baudrate first
+            debugLogging: true,  // Enable verbose debug logging
             terminal: new EspLoaderTerminal({
                 clean: () => document.getElementById('esp-console').textContent = "",
                 writeLine: (data) => log(data, 'esp-console'),
@@ -70,8 +72,25 @@ document.getElementById('esp-connect').addEventListener('click', async () => {
         });
 
         log("Connecting...", 'esp-console');
-        await espLoader.main();
-        await espLoader.flash_id();
+        log("Note: If connection fails, try holding the BOOT button on your ESP32 while clicking Connect.", 'esp-console');
+
+        try {
+            await espLoader.main();
+        } catch (err) {
+            log("Connection failed. Attempting to reset...", 'esp-console');
+            // Sometimes a hard reset helps
+            await espTransport.setDTR(false);
+            await espTransport.setRTS(true);
+            await new Promise(r => setTimeout(r, 100));
+            await espTransport.setDTR(true);
+            await espTransport.setRTS(false);
+            await new Promise(r => setTimeout(r, 100));
+            await espTransport.setDTR(false);
+
+            // Retry main
+            await espLoader.main();
+        }
+        await espLoader.flashId();
 
         log("Connected to " + espLoader.chip.CHIP_NAME, 'esp-console');
         document.getElementById('esp-flash').disabled = false;
@@ -115,10 +134,10 @@ document.getElementById('esp-flash').addEventListener('click', async () => {
 
             const fileArray = [{ data: data, address: offset }];
 
-            await espLoader.write_flash({
+            await espLoader.writeFlash({
                 fileArray: fileArray,
-                flash_size: 'keep',
-                erase_all: false,
+                flashSize: 'keep',
+                eraseAll: false,
                 compress: true,
                 reportProgress: (fileIndex, written, total) => {
                     const percent = Math.round((written / total) * 100);
