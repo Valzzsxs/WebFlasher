@@ -76,30 +76,41 @@ document.getElementById('esp-connect').addEventListener('click', async () => {
 
         try {
             await espLoader.main();
+            await espLoader.flashId();
+
+            log("Connected to " + espLoader.chip.CHIP_NAME, 'esp-console');
+            document.getElementById('esp-flash').disabled = false;
+            document.getElementById('esp-connect').textContent = "Connected";
+            document.getElementById('esp-connect').disabled = true;
+            document.getElementById('esp-reset').style.display = 'inline-block'; // Show reset button after connection
         } catch (err) {
-            log("Connection failed. Attempting to reset...", 'esp-console');
-            // Sometimes a hard reset helps
-            await espTransport.setDTR(false);
-            await espTransport.setRTS(true);
-            await new Promise(r => setTimeout(r, 100));
-            await espTransport.setDTR(true);
-            await espTransport.setRTS(false);
-            await new Promise(r => setTimeout(r, 100));
-            await espTransport.setDTR(false);
-
-            // Retry main
-            await espLoader.main();
+            log("Connection failed: " + err.message, 'esp-console');
+            log("Ensure the device is in Bootloader Mode. Hold the BOOT button on the ESP32 while clicking Connect/Reset.", 'esp-console');
+            document.getElementById('esp-reset').style.display = 'inline-block'; // Allow manual reset
         }
-        await espLoader.flashId();
-
-        log("Connected to " + espLoader.chip.CHIP_NAME, 'esp-console');
-        document.getElementById('esp-flash').disabled = false;
-        document.getElementById('esp-connect').textContent = "Connected";
-        document.getElementById('esp-connect').disabled = true;
 
     } catch (e) {
         log("Error: " + e.message, 'esp-console');
         console.error(e);
+    }
+});
+
+// Manual Reset / Boot Mode Toggle
+document.getElementById('esp-reset').addEventListener('click', async () => {
+    if (!espTransport) return;
+
+    log("Toggling DTR/RTS to reset device...", 'esp-console');
+    try {
+        await espTransport.setDTR(false);
+        await espTransport.setRTS(true);
+        await new Promise(r => setTimeout(r, 100));
+        await espTransport.setDTR(true);
+        await espTransport.setRTS(false);
+        await new Promise(r => setTimeout(r, 100));
+        await espTransport.setDTR(false);
+        log("Reset sequence sent. Try connecting again if needed.", 'esp-console');
+    } catch (e) {
+        log("Reset failed: " + e.message, 'esp-console');
     }
 });
 
