@@ -70,7 +70,7 @@ document.getElementById('esp-connect').addEventListener('click', async () => {
         });
 
         log("Connecting...", 'esp-console');
-        await espLoader.main_fn();
+        await espLoader.main();
         await espLoader.flash_id();
 
         log("Connected to " + espLoader.chip.CHIP_NAME, 'esp-console');
