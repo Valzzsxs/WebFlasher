@@ -80,6 +80,8 @@ document.getElementById('esp-connect').addEventListener('click', async () => {
 
             log("Connected to " + espLoader.chip.CHIP_NAME, 'esp-console');
             document.getElementById('esp-flash').disabled = false;
+        document.getElementById('esp-erase').disabled = false;
+        document.getElementById('esp-serial-start').disabled = false;
             document.getElementById('esp-connect').textContent = "Connected";
             document.getElementById('esp-connect').disabled = true;
             document.getElementById('esp-reset').style.display = 'inline-block'; // Show reset button after connection
@@ -142,6 +144,8 @@ document.getElementById('esp-flash').addEventListener('click', async () => {
             const progressContainer = document.getElementById('esp-progress-container');
             const progressBar = document.getElementById('esp-progress-bar');
             progressContainer.classList.remove('hidden');
+            progressBar.style.width = "0%";
+            progressBar.textContent = "0%";
 
             const fileArray = [{ data: data, address: offset }];
 
@@ -166,6 +170,95 @@ document.getElementById('esp-flash').addEventListener('click', async () => {
 
     reader.readAsBinaryString(file);
 });
+
+document.getElementById('esp-erase').addEventListener('click', async () => {
+    if (!confirm("This will erase the entire flash memory of the ESP32. Are you sure?")) return;
+
+    try {
+        log("Erasing flash memory...", 'esp-console');
+        await espLoader.eraseFlash();
+        log("Flash erase complete!", 'esp-console');
+    } catch (e) {
+        log("Erase failed: " + e.message, 'esp-console');
+    }
+});
+
+// Serial Monitor Logic
+let serialReader;
+let serialReadableStreamClosed;
+
+document.getElementById('esp-serial-start').addEventListener('click', async () => {
+    if (!espTransport || !espTransport.device) {
+        log("No device connected.", 'esp-console');
+        return;
+    }
+
+    // We need to disconnect the loader to free the port for raw serial reading
+    // But actually, we can try to reuse the port if the transport supports it,
+    // or we might need to close and reopen.
+    // For simplicity with Web Serial, we can just read from the port directly
+    // since we already have it open via Transport.
+
+    // However, Transport might be holding locks.
+    // Let's try reading directly using the same port object stored in espTransport.device
+
+    log("Starting Serial Monitor at 115200 baud...", 'esp-console');
+    document.getElementById('esp-serial-start').disabled = true;
+    document.getElementById('esp-serial-stop').disabled = false;
+
+    // Reset the device to start running firmware
+    await espTransport.setDTR(false);
+    await espTransport.setRTS(true);
+    await new Promise(r => setTimeout(r, 100));
+    await espTransport.setDTR(true); // Reset
+    await espTransport.setRTS(false);
+    await new Promise(r => setTimeout(r, 100));
+    await espTransport.setDTR(false);
+
+    readSerialLoop();
+});
+
+document.getElementById('esp-serial-stop').addEventListener('click', async () => {
+    if (serialReader) {
+        await serialReader.cancel();
+        serialReader = null;
+    }
+    document.getElementById('esp-serial-start').disabled = false;
+    document.getElementById('esp-serial-stop').disabled = true;
+    log("Serial Monitor stopped.", 'esp-console');
+});
+
+async function readSerialLoop() {
+    const port = espTransport.device;
+
+    // Check if port is readable
+    if (!port.readable) {
+        log("Port is not readable. Reconnecting might be needed.", 'esp-console');
+        return;
+    }
+
+    const textDecoder = new TextDecoderStream();
+    serialReadableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+    serialReader = textDecoder.readable.getReader();
+
+    try {
+        while (true) {
+            const { value, done } = await serialReader.read();
+            if (done) {
+                // Allow the serial port to be closed later.
+                break;
+            }
+            if (value) {
+                log(value, 'esp-console');
+            }
+        }
+    } catch (error) {
+        log("Serial read error: " + error, 'esp-console');
+    } finally {
+        serialReader.releaseLock();
+    }
+}
+
 
 // Helper for ESPLoader terminal
 class EspLoaderTerminal {
