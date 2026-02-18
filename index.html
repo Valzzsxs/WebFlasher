@@ -21,7 +21,6 @@
             <h2>ESP32 Flasher</h2>
             <div class="controls">
                 <button id="esp-connect" class="btn primary">Connect</button>
-                <button id="esp-reset" class="btn warning" style="display:none;">Reset / Boot Mode</button>
                 <div class="file-group">
                     <label for="esp-file">Firmware (.bin):</label>
                     <input type="file" id="esp-file" accept=".bin">
@@ -36,6 +35,7 @@
             <div class="controls">
                 <button id="esp-serial-start" class="btn warning" disabled>Start Serial Monitor</button>
                 <button id="esp-serial-stop" class="btn danger" disabled>Stop Serial Monitor</button>
+                <button id="esp-console-clear" class="btn secondary">Clear Console</button>
             </div>
             <div class="status">
                 <div id="esp-progress-container" class="progress-container hidden">
@@ -60,6 +60,7 @@
                     <input type="file" id="bw16-file" accept=".bin">
                 </div>
                 <button id="bw16-upload" class="btn success" disabled>Upload (Raw)</button>
+                <button id="bw16-console-clear" class="btn secondary">Clear Console</button>
             </div>
             <div id="bw16-console" class="console"></div>
         </div>
