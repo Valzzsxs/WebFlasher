@@ -80,39 +80,18 @@ document.getElementById('esp-connect').addEventListener('click', async () => {
 
             log("Connected to " + espLoader.chip.CHIP_NAME, 'esp-console');
             document.getElementById('esp-flash').disabled = false;
-        document.getElementById('esp-erase').disabled = false;
-        document.getElementById('esp-serial-start').disabled = false;
+            document.getElementById('esp-erase').disabled = false;
+            document.getElementById('esp-serial-start').disabled = false;
             document.getElementById('esp-connect').textContent = "Connected";
             document.getElementById('esp-connect').disabled = true;
-            document.getElementById('esp-reset').style.display = 'inline-block'; // Show reset button after connection
         } catch (err) {
             log("Connection failed: " + err.message, 'esp-console');
-            log("Ensure the device is in Bootloader Mode. Hold the BOOT button on the ESP32 while clicking Connect/Reset.", 'esp-console');
-            document.getElementById('esp-reset').style.display = 'inline-block'; // Allow manual reset
+            log("Ensure the device is in Bootloader Mode. Hold the BOOT button on the ESP32 while clicking Connect.", 'esp-console');
         }
 
     } catch (e) {
         log("Error: " + e.message, 'esp-console');
         console.error(e);
-    }
-});
-
-// Manual Reset / Boot Mode Toggle
-document.getElementById('esp-reset').addEventListener('click', async () => {
-    if (!espTransport) return;
-
-    log("Toggling DTR/RTS to reset device...", 'esp-console');
-    try {
-        await espTransport.setDTR(false);
-        await espTransport.setRTS(true);
-        await new Promise(r => setTimeout(r, 100));
-        await espTransport.setDTR(true);
-        await espTransport.setRTS(false);
-        await new Promise(r => setTimeout(r, 100));
-        await espTransport.setDTR(false);
-        log("Reset sequence sent. Try connecting again if needed.", 'esp-console');
-    } catch (e) {
-        log("Reset failed: " + e.message, 'esp-console');
     }
 });
 
@@ -183,6 +162,14 @@ document.getElementById('esp-erase').addEventListener('click', async () => {
     }
 });
 
+document.getElementById('esp-console-clear').addEventListener('click', () => {
+    document.getElementById('esp-console').textContent = "";
+});
+
+document.getElementById('bw16-console-clear').addEventListener('click', () => {
+    document.getElementById('bw16-console').textContent = "";
+});
+
 // Serial Monitor Logic
 let serialReader;
 let serialReadableStreamClosed;
@@ -192,10 +179,14 @@ let serialPort = null;
 document.getElementById('esp-serial-start').addEventListener('click', async () => {
     // If transport is active, we must disconnect it first to release the lock
     if (espTransport) {
-        await espTransport.disconnect();
-        await espTransport.waitForUnlock(1500);
-        // We reuse the port device from the transport if possible, or request a new one if needed
-        // Ideally, we'd store the port object before disconnecting
+        try {
+            await espTransport.disconnect();
+            await espTransport.waitForUnlock(1500);
+        } catch (e) {
+            log("Warning: Disconnect failed (port might be closed): " + e.message, 'esp-console');
+        }
+
+        // We reuse the port device from the transport if possible
         if (espTransport.device) {
              serialPort = espTransport.device;
         }
@@ -206,7 +197,13 @@ document.getElementById('esp-serial-start').addEventListener('click', async () =
     // If we don't have a port (e.g., disconnected fully), request one
     if (!serialPort) {
         try {
-            serialPort = await navigator.serial.requestPort();
+            const filters = [
+                { usbVendorId: 0x10c4, usbProductId: 0xea60 }, // CP210x
+                { usbVendorId: 0x1a86, usbProductId: 0x7523 }, // CH340
+                { usbVendorId: 0x303a, usbProductId: 0x1001 }, // Espressif USB
+                { usbVendorId: 0x303a, usbProductId: 0x8002 }, // Espressif USB
+            ];
+            serialPort = await navigator.serial.requestPort({ filters });
         } catch (e) {
             log("No port selected for Serial Monitor.", 'esp-console');
             return;
@@ -214,24 +211,33 @@ document.getElementById('esp-serial-start').addEventListener('click', async () =
     }
 
     try {
-        if (!serialPort.readable) {
+        if (serialPort.readable) {
+             log("Port is already readable. Closing to ensure clean state.", 'esp-console');
+             // If somehow readable but we want to reset params, close it.
+             // But usually readable means locked. If it's not locked but open...
+             // Let's just try to open if NOT readable.
+        } else {
              await serialPort.open({ baudRate: 115200 });
         }
     } catch (e) {
-        log("Error opening port for Serial Monitor: " + e.message, 'esp-console');
-        return;
+        if (e.message.includes("The port is already open")) {
+             // Ignore, we can proceed
+        } else {
+            log("Error opening port for Serial Monitor: " + e.message, 'esp-console');
+            return;
+        }
     }
 
     log("Starting Serial Monitor at 115200 baud...", 'esp-console');
     document.getElementById('esp-serial-start').disabled = true;
     document.getElementById('esp-serial-stop').disabled = false;
+
     // Disable flash buttons while serial monitor is active to prevent conflicts
     document.getElementById('esp-flash').disabled = true;
     document.getElementById('esp-erase').disabled = true;
     document.getElementById('esp-connect').disabled = true;
 
-    // Reset sequence to boot firmware
-    // Note: Manual DTR/RTS toggling on a raw port
+    // Reset sequence to boot firmware (Toggle DTR/RTS)
     try {
         await serialPort.setSignals({ dataTerminalReady: false, requestToSend: true });
         await new Promise(r => setTimeout(r, 100));
@@ -239,7 +245,7 @@ document.getElementById('esp-serial-start').addEventListener('click', async () =
         await new Promise(r => setTimeout(r, 100));
         await serialPort.setSignals({ dataTerminalReady: false, requestToSend: false });
     } catch (e) {
-        log("Reset signal failed: " + e.message, 'esp-console');
+        log("Reset signal warning: " + e.message, 'esp-console');
     }
 
     readSerialLoop();

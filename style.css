@@ -127,6 +127,11 @@ input[type="text"] {
     color: white;
 }
 
+.btn.secondary {
+    background-color: #6c757d; /* Grey for secondary actions */
+    color: white;
+}
+
 .console {
     background-color: var(--console-bg);
     color: var(--console-text);
