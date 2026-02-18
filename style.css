@@ -117,6 +117,16 @@ input[type="text"] {
     background-color: var(--success-color);
 }
 
+.btn.warning {
+    background-color: var(--warning-color);
+    color: var(--warning-text);
+}
+
+.btn.danger {
+    background-color: #dc3545; /* Red for danger */
+    color: white;
+}
+
 .console {
     background-color: var(--console-bg);
     color: var(--console-text);
