@@ -63,7 +63,7 @@ document.getElementById('esp-connect').addEventListener('click', async () => {
             transport: espTransport,
             baudrate: 115200,
             romBaudrate: 115200, // Try to sync at lower baudrate first
-            debugLogging: true,  // Enable verbose debug logging
+            debugLogging: false, // Disable verbose debug logging
             terminal: new EspLoaderTerminal({
                 clean: () => document.getElementById('esp-console').textContent = "",
                 writeLine: (data) => log(data, 'esp-console'),
@@ -187,33 +187,60 @@ document.getElementById('esp-erase').addEventListener('click', async () => {
 let serialReader;
 let serialReadableStreamClosed;
 
+let serialPort = null;
+
 document.getElementById('esp-serial-start').addEventListener('click', async () => {
-    if (!espTransport || !espTransport.device) {
-        log("No device connected.", 'esp-console');
-        return;
+    // If transport is active, we must disconnect it first to release the lock
+    if (espTransport) {
+        await espTransport.disconnect();
+        await espTransport.waitForUnlock(1500);
+        // We reuse the port device from the transport if possible, or request a new one if needed
+        // Ideally, we'd store the port object before disconnecting
+        if (espTransport.device) {
+             serialPort = espTransport.device;
+        }
+        espTransport = null;
+        espLoader = null;
     }
 
-    // We need to disconnect the loader to free the port for raw serial reading
-    // But actually, we can try to reuse the port if the transport supports it,
-    // or we might need to close and reopen.
-    // For simplicity with Web Serial, we can just read from the port directly
-    // since we already have it open via Transport.
+    // If we don't have a port (e.g., disconnected fully), request one
+    if (!serialPort) {
+        try {
+            serialPort = await navigator.serial.requestPort();
+        } catch (e) {
+            log("No port selected for Serial Monitor.", 'esp-console');
+            return;
+        }
+    }
 
-    // However, Transport might be holding locks.
-    // Let's try reading directly using the same port object stored in espTransport.device
+    try {
+        if (!serialPort.readable) {
+             await serialPort.open({ baudRate: 115200 });
+        }
+    } catch (e) {
+        log("Error opening port for Serial Monitor: " + e.message, 'esp-console');
+        return;
+    }
 
     log("Starting Serial Monitor at 115200 baud...", 'esp-console');
     document.getElementById('esp-serial-start').disabled = true;
     document.getElementById('esp-serial-stop').disabled = false;
+    // Disable flash buttons while serial monitor is active to prevent conflicts
+    document.getElementById('esp-flash').disabled = true;
+    document.getElementById('esp-erase').disabled = true;
+    document.getElementById('esp-connect').disabled = true;
 
-    // Reset the device to start running firmware
-    await espTransport.setDTR(false);
-    await espTransport.setRTS(true);
-    await new Promise(r => setTimeout(r, 100));
-    await espTransport.setDTR(true); // Reset
-    await espTransport.setRTS(false);
-    await new Promise(r => setTimeout(r, 100));
-    await espTransport.setDTR(false);
+    // Reset sequence to boot firmware
+    // Note: Manual DTR/RTS toggling on a raw port
+    try {
+        await serialPort.setSignals({ dataTerminalReady: false, requestToSend: true });
+        await new Promise(r => setTimeout(r, 100));
+        await serialPort.setSignals({ dataTerminalReady: true, requestToSend: false }); // Reset
+        await new Promise(r => setTimeout(r, 100));
+        await serialPort.setSignals({ dataTerminalReady: false, requestToSend: false });
+    } catch (e) {
+        log("Reset signal failed: " + e.message, 'esp-console');
+    }
 
     readSerialLoop();
 });
@@ -225,27 +252,22 @@ document.getElementById('esp-serial-stop').addEventListener('click', async () =>
     }
     document.getElementById('esp-serial-start').disabled = false;
     document.getElementById('esp-serial-stop').disabled = true;
-    log("Serial Monitor stopped.", 'esp-console');
+    // Re-enable connect button so user can reconnect for flashing
+    document.getElementById('esp-connect').disabled = false;
+    document.getElementById('esp-connect').textContent = "Connect";
+
+    log("Serial Monitor stopped. Reconnect to flash again.", 'esp-console');
 });
 
 async function readSerialLoop() {
-    const port = espTransport.device;
-
-    // Check if port is readable
-    if (!port.readable) {
-        log("Port is not readable. Reconnecting might be needed.", 'esp-console');
-        return;
-    }
-
     const textDecoder = new TextDecoderStream();
-    serialReadableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+    serialReadableStreamClosed = serialPort.readable.pipeTo(textDecoder.writable);
     serialReader = textDecoder.readable.getReader();
 
     try {
         while (true) {
             const { value, done } = await serialReader.read();
             if (done) {
-                // Allow the serial port to be closed later.
                 break;
             }
             if (value) {
