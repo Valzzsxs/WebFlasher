@@ -10,9 +10,15 @@ let serialReader = null;
 
 // UI Helpers
 function log(msg, consoleId) {
+    if (!msg) return; // Ignore null/undefined
+    const trimmed = String(msg).trim();
+    if (trimmed.length === 0) return; // Ignore empty strings or whitespace-only
+
     const consoleDiv = document.getElementById(consoleId);
     const time = new Date().toLocaleTimeString();
-    consoleDiv.textContent += `[${time}] ${msg}\n`;
+    // Use innerText or append to handle newlines correctly if needed,
+    // but textContent is safer. We'll strip extra newlines from the msg if it's just a raw dump.
+    consoleDiv.textContent += `[${time}] ${trimmed}\n`;
     consoleDiv.scrollTop = consoleDiv.scrollHeight;
 }
 
