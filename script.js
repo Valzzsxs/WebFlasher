@@ -308,8 +308,13 @@ document.getElementById('bw16-connect').addEventListener('click', async () => {
     }
 
     try {
-        bw16Port = await navigator.serial.requestPort();
-        await bw16Port.open({ baudRate: 115200 }); // Default for many logs
+        const filters = [
+            { usbVendorId: 0x10c4, usbProductId: 0xea60 }, // CP210x
+            { usbVendorId: 0x1a86, usbProductId: 0x7523 }, // CH340
+            { usbVendorId: 0x0bda }, // Realtek
+        ];
+        bw16Port = await navigator.serial.requestPort({ filters });
+        await bw16Port.open({ baudRate: 115200 });
 
         log("Port opened. Baud: 115200", 'bw16-console');
         document.getElementById('bw16-connect').textContent = "Connected";
@@ -368,9 +373,14 @@ document.getElementById('bw16-upload').addEventListener('click', async () => {
             return;
         }
 
+        // We need to stop the reader loop to prevent locking if we want full control,
+        // but for raw writing while reading is active (full duplex), it's okay IF the browser supports it.
+        // Usually, separate locks for readable and writable are fine.
+
         const writer = bw16Port.writable.getWriter();
         const uint8Array = new Uint8Array(data);
-        const chunkSize = 1024; // 1KB chunks
+        // Use smaller chunks for stability
+        const chunkSize = 256;
 
         log(`Sending ${file.name} (${uint8Array.length} bytes)...`, 'bw16-console');
 
@@ -379,8 +389,8 @@ document.getElementById('bw16-upload').addEventListener('click', async () => {
                 const chunk = uint8Array.slice(i, i + chunkSize);
                 await writer.write(chunk);
                 log(`Sent ${i + chunk.length}/${uint8Array.length} bytes`, 'bw16-console');
-                // Small delay to allow buffer to drain slightly
-                await new Promise(r => setTimeout(r, 10));
+                // Increased delay to 50ms to prevent buffer overflow on the device
+                await new Promise(r => setTimeout(r, 50));
             }
             log("Upload finished.", 'bw16-console');
         } catch (err) {
