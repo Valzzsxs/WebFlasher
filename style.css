@@ -2,9 +2,15 @@
     --bg-color: #1e1e1e;
     --text-color: #f0f0f0;
     --accent-color: #007bff;
+    --accent-hover: #0056b3;
     --success-color: #28a745;
+    --success-hover: #218838;
     --warning-color: #ffc107;
-    --warning-text: #333;
+    --warning-hover: #e0a800;
+    --danger-color: #dc3545;
+    --danger-hover: #c82333;
+    --secondary-color: #6c757d;
+    --secondary-hover: #5a6268;
     --console-bg: #000;
     --console-text: #0f0;
     --panel-bg: #2d2d2d;
@@ -18,37 +24,46 @@ body {
     padding: 20px;
     display: flex;
     justify-content: center;
+    min-height: 100vh;
 }
 
 .container {
-    max-width: 800px;
+    max-width: 900px;
     width: 100%;
     background-color: var(--panel-bg);
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.3);
 }
 
 header h1 {
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 30px;
+    font-weight: 600;
 }
 
 .tabs {
     display: flex;
     justify-content: center;
-    margin-bottom: 20px;
-    border-bottom: 1px solid #444;
+    margin-bottom: 25px;
+    border-bottom: 2px solid #444;
 }
 
 .tab-btn {
     background: none;
     border: none;
-    color: #888;
-    padding: 10px 20px;
-    font-size: 1.2rem;
+    color: #aaa;
+    padding: 12px 25px;
+    font-size: 1.1rem;
     cursor: pointer;
-    transition: color 0.3s, border-bottom 0.3s;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+}
+
+.tab-btn:hover {
+    color: var(--text-color);
 }
 
 .tab-btn.active {
@@ -58,10 +73,16 @@ header h1 {
 
 .section {
     display: none;
+    animation: fadeIn 0.3s ease-in-out;
 }
 
 .section.active {
     display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 .controls {
@@ -70,9 +91,9 @@ header h1 {
     gap: 15px;
     align-items: center;
     margin-bottom: 20px;
-    background: #333;
-    padding: 15px;
-    border-radius: 5px;
+    background: #383838;
+    padding: 20px;
+    border-radius: 8px;
 }
 
 .input-group, .file-group {
@@ -81,77 +102,111 @@ header h1 {
 }
 
 label {
-    font-size: 0.9rem;
-    margin-bottom: 5px;
-    color: #aaa;
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+    color: #ccc;
+    font-weight: 500;
 }
 
 input[type="text"] {
-    padding: 8px;
-    border-radius: 4px;
+    padding: 10px;
+    border-radius: 6px;
     border: 1px solid #555;
     background: #222;
     color: #fff;
+    outline: none;
+}
+
+input[type="text"]:focus {
+    border-color: var(--accent-color);
 }
 
 .btn {
     padding: 10px 20px;
     border: none;
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
-    font-weight: bold;
+    font-weight: 600;
     color: white;
-    transition: opacity 0.2s;
+    transition: background-color 0.2s, transform 0.1s;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+}
+
+.btn:active {
+    transform: scale(0.98);
 }
 
 .btn:disabled {
-    opacity: 0.5;
+    opacity: 0.6;
     cursor: not-allowed;
+    pointer-events: none;
 }
 
 .btn.primary {
     background-color: var(--accent-color);
 }
+.btn.primary:hover { background-color: var(--accent-hover); }
 
 .btn.success {
     background-color: var(--success-color);
 }
+.btn.success:hover { background-color: var(--success-hover); }
 
 .btn.warning {
     background-color: var(--warning-color);
-    color: var(--warning-text);
+    color: #222;
 }
+.btn.warning:hover { background-color: var(--warning-hover); }
 
 .btn.danger {
-    background-color: #dc3545; /* Red for danger */
-    color: white;
+    background-color: var(--danger-color);
 }
+.btn.danger:hover { background-color: var(--danger-hover); }
 
 .btn.secondary {
-    background-color: #6c757d; /* Grey for secondary actions */
-    color: white;
+    background-color: var(--secondary-color);
 }
+.btn.secondary:hover { background-color: var(--secondary-hover); }
 
 .console {
     background-color: var(--console-bg);
     color: var(--console-text);
-    font-family: 'Courier New', Courier, monospace;
-    padding: 10px;
-    height: 300px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    padding: 15px;
+    height: 350px;
     overflow-y: auto;
-    border-radius: 4px;
+    border-radius: 8px;
     white-space: pre-wrap;
     font-size: 0.9rem;
+    line-height: 1.4;
     border: 1px solid #444;
+}
+
+/* Custom Scrollbar for Console */
+.console::-webkit-scrollbar {
+    width: 10px;
+}
+.console::-webkit-scrollbar-track {
+    background: #111;
+}
+.console::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 5px;
+}
+.console::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }
 
 .progress-container {
     width: 100%;
     background-color: #444;
-    border-radius: 4px;
-    margin-bottom: 10px;
-    height: 20px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    height: 24px;
     overflow: hidden;
+    position: relative;
 }
 
 .progress-bar {
@@ -159,20 +214,24 @@ input[type="text"] {
     background-color: var(--success-color);
     width: 0%;
     text-align: center;
-    line-height: 20px;
-    font-size: 0.8rem;
-    transition: width 0.3s;
+    line-height: 24px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: white;
+    transition: width 0.3s ease;
 }
 
 .alert {
     padding: 15px;
     margin-bottom: 20px;
-    border-radius: 4px;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    border-left: 4px solid var(--warning-color);
 }
 
 .alert.warning {
-    background-color: var(--warning-color);
-    color: var(--warning-text);
+    background-color: rgba(255, 193, 7, 0.1);
+    color: #fff;
 }
 
 .hidden {
