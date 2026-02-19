@@ -4,69 +4,590 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IoT Firmware Flasher</title>
-    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-1: #1a1c22;
+            --bg-2: #22252e;
+            --bg-3: #2a2d38;
+            --glass: rgba(255,255,255,0.05);
+            --glass-border: rgba(255,255,255,0.1);
+            --glass-hover: rgba(255,255,255,0.08);
+            --accent: #6c8fff;
+            --accent2: #a78bfa;
+            --green: #34d399;
+            --red: #f87171;
+            --yellow: #fbbf24;
+            --text: #e2e8f0;
+            --text-muted: #64748b;
+            --text-soft: #94a3b8;
+            --radius: 14px;
+            --radius-sm: 8px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--bg-1);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Ambient blobs */
+        .blob {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(90px);
+            opacity: 0.10;
+            pointer-events: none;
+            z-index: 0;
+            animation: blobFloat 14s ease-in-out infinite;
+        }
+        .blob-1 { width: 520px; height: 520px; background: #6c8fff; top: -120px; right: -100px; animation-delay: 0s; }
+        .blob-2 { width: 420px; height: 420px; background: #a78bfa; bottom: -100px; left: -80px; animation-delay: -5s; }
+        .blob-3 { width: 280px; height: 280px; background: #34d399; top: 45%; left: 38%; animation-delay: -9s; }
+
+        @keyframes blobFloat {
+            0%, 100% { transform: translate(0,0) scale(1); }
+            33% { transform: translate(18px,-18px) scale(1.04); }
+            66% { transform: translate(-14px,14px) scale(0.97); }
+        }
+
+        .container {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 32px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* HEADER */
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            padding: 20px 24px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-radius: var(--radius);
+        }
+
+        .header-left { display: flex; align-items: center; gap: 14px; }
+
+        .header-icon {
+            width: 44px; height: 44px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            border-radius: 11px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 4px 20px rgba(108,143,255,0.35);
+            flex-shrink: 0;
+        }
+
+        header h1 { font-size: 19px; font-weight: 700; letter-spacing: -0.3px; }
+        header p { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+        .status-pill {
+            display: flex; align-items: center; gap: 6px;
+            padding: 7px 13px;
+            background: rgba(52,211,153,0.1);
+            border: 1px solid rgba(52,211,153,0.2);
+            border-radius: 20px;
+            font-size: 12px; font-weight: 500; color: var(--green);
+            white-space: nowrap;
+        }
+
+        .pill-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
+            animation: pdot 2s ease-in-out infinite;
+        }
+        @keyframes pdot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.75)} }
+
+        /* TABS */
+        .tabs {
+            display: flex; gap: 6px; margin-bottom: 16px;
+            padding: 5px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-radius: var(--radius);
+        }
+
+        .tab-btn {
+            flex: 1; padding: 10px 16px;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            color: var(--text-muted);
+            font-family: 'Inter', sans-serif;
+            font-size: 13px; font-weight: 500;
+            cursor: pointer;
+            transition: all 0.22s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .tab-btn:hover { color: var(--text); background: var(--glass-hover); }
+        .tab-btn.active {
+            background: rgba(108,143,255,0.14);
+            border-color: rgba(108,143,255,0.28);
+            color: #a0b4ff;
+            font-weight: 600;
+            box-shadow: 0 2px 14px rgba(108,143,255,0.12);
+        }
+
+        .chip {
+            padding: 2px 7px; border-radius: 10px;
+            font-size: 10px; font-weight: 600;
+            background: rgba(108,143,255,0.15); color: var(--accent);
+        }
+        .chip.yellow { background: rgba(251,191,36,0.12); color: #fbbf24; }
+
+        /* SECTION */
+        .section { display: none; }
+        .section.active {
+            display: flex; flex-direction: column; gap: 14px;
+            animation: fadeUp 0.3s ease;
+        }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+        /* CARD */
+        .card {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-radius: var(--radius);
+            padding: 20px;
+            transition: border-color 0.2s;
+        }
+        .card:hover { border-color: rgba(255,255,255,0.14); }
+
+        .card-label {
+            font-size: 11px; font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 1px;
+            margin-bottom: 14px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .card-label-icon {
+            width: 20px; height: 20px; border-radius: 5px;
+            background: rgba(108,143,255,0.14);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 11px;
+        }
+
+        /* GRIDS */
+        .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .row > * { flex: 1; min-width: 0; }
+        .row > .btn { flex: 0 0 auto; }
+
+        /* BUTTONS */
+        .btn {
+            padding: 10px 16px;
+            border-radius: var(--radius-sm);
+            border: 1px solid transparent;
+            font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+            white-space: nowrap;
+        }
+        .btn:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+
+        .btn.primary {
+            background: rgba(108,143,255,0.14); border-color: rgba(108,143,255,0.3);
+            color: #a0b4ff;
+        }
+        .btn.primary:hover { background: rgba(108,143,255,0.22); border-color: rgba(108,143,255,0.55); color: #c0d0ff; box-shadow: 0 4px 18px rgba(108,143,255,0.2); }
+
+        .btn.success {
+            background: rgba(52,211,153,0.11); border-color: rgba(52,211,153,0.28);
+            color: #6ee7b7;
+        }
+        .btn.success:hover { background: rgba(52,211,153,0.18); border-color: rgba(52,211,153,0.5); color: #a7f3d0; box-shadow: 0 4px 18px rgba(52,211,153,0.2); }
+
+        .btn.danger {
+            background: rgba(248,113,113,0.1); border-color: rgba(248,113,113,0.24);
+            color: #fca5a5;
+        }
+        .btn.danger:hover { background: rgba(248,113,113,0.17); border-color: rgba(248,113,113,0.48); color: #fecaca; box-shadow: 0 4px 18px rgba(248,113,113,0.18); }
+
+        .btn.warning {
+            background: rgba(251,191,36,0.1); border-color: rgba(251,191,36,0.24);
+            color: #fcd34d;
+        }
+        .btn.warning:hover { background: rgba(251,191,36,0.17); border-color: rgba(251,191,36,0.5); box-shadow: 0 4px 18px rgba(251,191,36,0.15); }
+
+        .btn.ghost {
+            background: transparent; border-color: var(--glass-border); color: var(--text-soft);
+        }
+        .btn.ghost:hover { background: var(--glass-hover); color: var(--text); }
+
+        /* FILE DROP */
+        .file-drop {
+            position: relative;
+            border: 1.5px dashed rgba(255,255,255,0.11);
+            border-radius: var(--radius-sm);
+            padding: 11px 14px;
+            cursor: pointer;
+            transition: all 0.22s;
+            display: flex; align-items: center; gap: 10px;
+            font-size: 13px; color: var(--text-muted);
+        }
+        .file-drop input[type="file"] {
+            position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%;
+        }
+        .file-drop:hover { border-color: rgba(108,143,255,0.4); background: rgba(108,143,255,0.04); color: var(--text-soft); }
+        .file-drop.has-file { border-color: rgba(52,211,153,0.35); background: rgba(52,211,153,0.04); color: var(--green); }
+
+        .file-ico {
+            width: 28px; height: 28px; border-radius: 6px;
+            background: rgba(108,143,255,0.13);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px; flex-shrink: 0;
+            transition: background 0.2s;
+        }
+        .file-drop.has-file .file-ico { background: rgba(52,211,153,0.13); }
+
+        /* INPUT */
+        .input-wrap {
+            display: flex; align-items: stretch;
+            background: rgba(0,0,0,0.22);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-sm); overflow: hidden;
+            transition: border-color 0.2s;
+        }
+        .input-wrap:focus-within { border-color: rgba(108,143,255,0.45); }
+        .input-prefix {
+            padding: 0 11px;
+            font-size: 11px; font-weight: 600; color: var(--text-muted);
+            background: rgba(255,255,255,0.03);
+            border-right: 1px solid var(--glass-border);
+            display: flex; align-items: center; white-space: nowrap; letter-spacing: 0.5px;
+        }
+        .input-wrap input {
+            flex: 1; padding: 0 12px; height: 40px;
+            background: transparent; border: none; outline: none;
+            color: var(--text);
+            font-family: 'JetBrains Mono', monospace; font-size: 13px;
+        }
+        .input-wrap input::placeholder { color: var(--text-muted); }
+
+        /* PROGRESS */
+        .progress-wrap { display: none; }
+        .progress-wrap.show { display: block; }
+
+        .progress-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 8px;
+        }
+        .progress-lbl { font-size: 12px; font-weight: 500; color: var(--text-soft); }
+        .progress-pct {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px; font-weight: 500; color: var(--accent);
+        }
+        .progress-track {
+            height: 5px; background: rgba(255,255,255,0.06);
+            border-radius: 99px; overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%; width: 0%;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            border-radius: 99px; transition: width 0.3s ease;
+        }
+
+        /* ALERT */
+        .alert {
+            display: flex; gap: 12px;
+            padding: 14px 16px;
+            background: rgba(251,191,36,0.06);
+            border: 1px solid rgba(251,191,36,0.18);
+            border-radius: var(--radius-sm);
+            font-size: 13px; line-height: 1.6; color: #c8972a;
+        }
+        .alert-ico { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+        .alert strong { color: #fbbf24; }
+
+        /* DEVICE INFO */
+        .device-info {
+            display: none; align-items: center; gap: 10px;
+            padding: 10px 14px; margin-top: 12px;
+            background: rgba(52,211,153,0.06);
+            border: 1px solid rgba(52,211,153,0.18);
+            border-radius: var(--radius-sm);
+            font-size: 12px; font-weight: 500; color: #6ee7b7;
+        }
+        .device-info.visible { display: flex; }
+
+        /* CONSOLE */
+        .console-card {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: var(--radius); overflow: hidden;
+        }
+        .console-bar {
+            padding: 10px 16px;
+            background: rgba(255,255,255,0.02);
+            border-bottom: 1px solid var(--glass-border);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .c-dots { display: flex; gap: 6px; }
+        .c-dot { width: 10px; height: 10px; border-radius: 50%; }
+        .c-dot:nth-child(1) { background: #ff5f57; }
+        .c-dot:nth-child(2) { background: #ffbd2e; }
+        .c-dot:nth-child(3) { background: #28c941; }
+        .c-title { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+        .c-count { font-size: 11px; color: var(--text-muted); }
+
+        .console-body {
+            height: 200px; overflow-y: auto;
+            padding: 14px 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px; line-height: 1.85;
+            scroll-behavior: smooth;
+        }
+        .console-body::-webkit-scrollbar { width: 4px; }
+        .console-body::-webkit-scrollbar-track { background: transparent; }
+        .console-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+        .log-line { display: flex; gap: 12px; }
+        .log-t { color: var(--text-muted); min-width: 56px; font-size: 11px; }
+        .log-m { color: var(--text-soft); }
+        .log-m.info { color: #93c5fd; }
+        .log-m.success { color: var(--green); }
+        .log-m.error { color: var(--red); }
+        .log-m.warn { color: var(--yellow); }
+        .log-m.dim { color: var(--text-muted); }
+
+        .cursor {
+            display: inline-block; width: 7px; height: 12px;
+            background: var(--accent); margin-left: 2px;
+            vertical-align: middle; border-radius: 1px;
+            animation: cur 1.1s step-end infinite; opacity: 0.75;
+        }
+        @keyframes cur { 0%,100%{opacity:0.75} 50%{opacity:0} }
+
+        @media(max-width:600px) {
+            .row { flex-direction: column; }
+            header { flex-direction: column; gap: 12px; align-items: flex-start; }
+        }
+    </style>
 </head>
 <body>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+
     <div class="container">
+
         <header>
-            <h1>IoT Firmware Flasher</h1>
+            <div class="header-left">
+                <div class="header-icon">⚡</div>
+                <div>
+                    <h1>IoT Firmware Flasher</h1>
+                    <p>Web Serial Flash Tool — v2.4.1</p>
+                </div>
+            </div>
+            <div class="status-pill">
+                <div class="pill-dot"></div>
+                System Ready
+            </div>
         </header>
 
-        <nav class="tabs">
-            <button class="tab-btn active" onclick="switchTab('esp32')">ESP32</button>
-            <button class="tab-btn" onclick="switchTab('bw16')">BW16 (RTL8720DN)</button>
-        </nav>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('esp32',this)">
+                🔷 ESP32 <span class="chip">Stable</span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('bw16',this)">
+                🔶 BW16 RTL8720DN <span class="chip yellow">Beta</span>
+            </button>
+        </div>
 
+        <!-- ESP32 -->
         <div id="esp32-section" class="section active">
-            <h2>ESP32 Flasher</h2>
-            <div class="controls">
-                <button id="esp-connect" class="btn primary">Connect</button>
-                <div class="file-group">
-                    <label for="esp-file">Firmware (.bin):</label>
-                    <input type="file" id="esp-file" accept=".bin">
+
+            <div class="card">
+                <div class="card-label"><div class="card-label-icon">🔌</div> Device &amp; Firmware</div>
+                <div class="row">
+                    <button id="esp-connect" class="btn primary" onclick="handleConnect('esp')">⟳ Connect</button>
+                    <div class="file-drop" id="esp-drop">
+                        <input type="file" id="esp-file" accept=".bin" onchange="handleFile(this,'esp-drop','esp-fname')">
+                        <div class="file-ico">📦</div>
+                        <span id="esp-fname">Select firmware (.bin)</span>
+                    </div>
+                    <div class="input-wrap">
+                        <span class="input-prefix">ADDR</span>
+                        <input type="text" id="esp-offset" value="0x0" placeholder="0x0">
+                    </div>
+                    <button id="esp-erase" class="btn danger" disabled onclick="handleErase()">🗑 Erase</button>
                 </div>
-                <div class="input-group">
-                    <label for="esp-offset">Flash Address (Hex):</label>
-                    <input type="text" id="esp-offset" value="0x0" placeholder="0x0">
-                </div>
-                <button id="esp-flash" class="btn success" disabled>Flash Firmware</button>
-                <button id="esp-erase" class="btn danger" disabled>Erase Flash</button>
-            </div>
-            <div class="controls">
-                <button id="esp-serial-start" class="btn warning" disabled>Start Serial Monitor</button>
-                <button id="esp-serial-stop" class="btn danger" disabled>Stop Serial Monitor</button>
-                <button id="esp-console-clear" class="btn secondary">Clear Console</button>
-            </div>
-            <div class="status">
-                <div id="esp-progress-container" class="progress-container hidden">
-                    <div id="esp-progress-bar" class="progress-bar">0%</div>
+                <div id="esp-dev-info" class="device-info">
+                    <span>✓</span><span id="esp-dev-label">Device connected</span>
                 </div>
             </div>
-            <div id="esp-console" class="console"></div>
+
+            <div class="card">
+                <div class="card-label"><div class="card-label-icon">⚡</div> Flash &amp; Serial Monitor</div>
+                <div class="row">
+                    <button id="esp-flash" class="btn success" disabled onclick="handleFlash('esp')">⚡ Flash Firmware</button>
+                    <button id="esp-serial-start" class="btn warning" disabled onclick="startSerial('esp')">▶ Start Monitor</button>
+                    <button id="esp-serial-stop" class="btn danger" disabled onclick="stopSerial('esp')">■ Stop Monitor</button>
+                    <button class="btn ghost" onclick="clearConsole('esp-body')">🗑 Clear</button>
+                </div>
+            </div>
+
+            <div id="esp-prog" class="progress-wrap">
+                <div class="card">
+                    <div class="progress-header">
+                        <span class="progress-lbl" id="esp-prog-label">Flashing firmware...</span>
+                        <span class="progress-pct" id="esp-prog-pct">0%</span>
+                    </div>
+                    <div class="progress-track">
+                        <div class="progress-fill" id="esp-prog-bar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="console-card">
+                <div class="console-bar">
+                    <div class="c-dots"><div class="c-dot"></div><div class="c-dot"></div><div class="c-dot"></div></div>
+                    <span class="c-title">Serial Output — ESP32</span>
+                    <span class="c-count" id="esp-count">1 lines</span>
+                </div>
+                <div class="console-body" id="esp-body">
+                    <div class="log-line"><span class="log-t">00:00:00</span><span class="log-m dim">System initialized. Waiting for device...</span></div>
+                    <div class="log-line"><span class="log-t"></span><span class="log-m dim"><span class="cursor"></span></span></div>
+                </div>
+            </div>
+
         </div>
 
+        <!-- BW16 -->
         <div id="bw16-section" class="section">
-            <h2>BW16 (RTL8720DN) Tool</h2>
-            <div class="alert warning">
-                <strong>Warning:</strong> Browser-based flashing for BW16 is experimental.
-                This tool provides a raw serial connection. The official AmebaD Image Tool
-                uses a specific handshake protocol which may not be fully replicated here.
-                Use this for serial logging or raw binary uploads if you know what you are doing.
+
+            <div class="alert">
+                <span class="alert-ico">⚠️</span>
+                <div><strong>Experimental Mode:</strong> Browser-based flashing for BW16 is experimental. This tool provides a raw serial connection. The official AmebaD Image Tool uses a specific handshake protocol which may not be fully replicated here.</div>
             </div>
-            <div class="controls">
-                <button id="bw16-connect" class="btn primary">Connect</button>
-                <div class="file-group">
-                    <label for="bw16-file">Firmware (.bin):</label>
-                    <input type="file" id="bw16-file" accept=".bin">
+
+            <div class="card">
+                <div class="card-label"><div class="card-label-icon">🔌</div> Device &amp; Firmware</div>
+                <div class="row">
+                    <button id="bw16-connect" class="btn primary" onclick="handleConnect('bw16')">⟳ Connect</button>
+                    <div class="file-drop" id="bw16-drop">
+                        <input type="file" id="bw16-file" accept=".bin" onchange="handleFile(this,'bw16-drop','bw16-fname')">
+                        <div class="file-ico">📦</div>
+                        <span id="bw16-fname">Select firmware (.bin)</span>
+                    </div>
                 </div>
-                <button id="bw16-upload" class="btn success" disabled>Upload (Raw)</button>
-                <button id="bw16-console-clear" class="btn secondary">Clear Console</button>
+                <div id="bw16-dev-info" class="device-info">
+                    <span>✓</span><span>Device connected</span>
+                </div>
             </div>
-            <div id="bw16-console" class="console"></div>
+
+            <div class="card">
+                <div class="card-label"><div class="card-label-icon">📤</div> Upload Controls</div>
+                <div class="row">
+                    <button id="bw16-upload" class="btn success" disabled onclick="handleFlash('bw16')">⚡ Upload Raw</button>
+                    <button class="btn ghost" onclick="clearConsole('bw16-body')">🗑 Clear Console</button>
+                </div>
+            </div>
+
+            <div class="console-card">
+                <div class="console-bar">
+                    <div class="c-dots"><div class="c-dot"></div><div class="c-dot"></div><div class="c-dot"></div></div>
+                    <span class="c-title">Serial Output — BW16</span>
+                    <span class="c-count" id="bw16-count">1 lines</span>
+                </div>
+                <div class="console-body" id="bw16-body">
+                    <div class="log-line"><span class="log-t">00:00:00</span><span class="log-m dim">BW16 tool ready. Connect device to begin...</span></div>
+                    <div class="log-line"><span class="log-t"></span><span class="log-m dim"><span class="cursor"></span></span></div>
+                </div>
+            </div>
+
         </div>
+
     </div>
 
     <script src="lib/crypto-js.min.js"></script>
     <script type="module" src="script.js"></script>
+
+    <script>
+        function switchTab(tab, btn) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(tab + '-section').classList.add('active');
+            btn.classList.add('active');
+        }
+
+        function handleFile(input, dropId, nameId) {
+            const drop = document.getElementById(dropId);
+            const name = document.getElementById(nameId);
+            if (input.files.length > 0) {
+                const f = input.files[0];
+                name.textContent = f.name + '  (' + (f.size/1024).toFixed(1) + ' KB)';
+                drop.classList.add('has-file');
+                drop.querySelector('.file-ico').textContent = '✅';
+            }
+        }
+
+        const lineCounts = { 'esp-body': 1, 'bw16-body': 1 };
+
+        function log(bodyId, msg, type) {
+            type = type || '';
+            const body = document.getElementById(bodyId);
+            const cur = body.querySelector('.cursor');
+            if (cur) cur.closest('.log-line').remove();
+            const now = new Date().toTimeString().slice(0,8);
+            const line = document.createElement('div');
+            line.className = 'log-line';
+            line.innerHTML = '<span class="log-t">' + now + '</span><span class="log-m ' + type + '">' + msg + '</span>';
+            body.appendChild(line);
+            const cl = document.createElement('div');
+            cl.className = 'log-line';
+            cl.innerHTML = '<span class="log-t"></span><span class="log-m dim"><span class="cursor"></span></span>';
+            body.appendChild(cl);
+            lineCounts[bodyId]++;
+            const cid = bodyId === 'esp-body' ? 'esp-count' : 'bw16-count';
+            document.getElementById(cid).textContent = lineCounts[bodyId] + ' lines';
+            body.scrollTop = body.scrollHeight;
+        }
+
+        function clearConsole(bodyId) {
+            const body = document.getElementById(bodyId);
+            const now = new Date().toTimeString().slice(0,8);
+            body.innerHTML = '<div class="log-line"><span class="log-t">'+now+'</span><span class="log-m dim">Console cleared.</span></div><div class="log-line"><span class="log-t"></span><span class="log-m dim"><span class="cursor"></span></span></div>';
+            lineCounts[bodyId] = 1;
+            const cid = bodyId === 'esp-body' ? 'esp-count' : 'bw16-count';
+            document.getElementById(cid).textContent = '1 lines';
+        }
+
+        function handleConnect(device) {
+            const bid = device === 'esp' ? 'esp-body' : 'bw16-body';
+            log(bid, 'Scanning for serial devices...', 'info');
+            setTimeout(() => log(bid, 'Waiting for user to select port...', 'dim'), 600);
+        }
+
+        function handleFlash(device) {
+            const bid = device === 'esp' ? 'esp-body' : 'bw16-body';
+            log(bid, 'Initiating flash sequence...', 'warn');
+        }
+
+        function handleErase() {
+            log('esp-body', 'Erase flash requested.', 'error');
+        }
+
+        function startSerial() { log('esp-body', 'Serial monitor started.', 'success'); }
+        function stopSerial() { log('esp-body', 'Serial monitor stopped.', 'warn'); }
+    </script>
 </body>
 </html>
