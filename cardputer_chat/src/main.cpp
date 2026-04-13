@@ -143,7 +143,7 @@ String queryGeminiAPI(String text) {
     }
 
     HTTPClient http;
-    String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=" + gemini_key;
+    String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=" + gemini_key;
     http.begin(*client, url);
     http.addHeader("Content-Type", "application/json");
 
