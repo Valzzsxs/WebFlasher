@@ -12,7 +12,7 @@
 Preferences preferences;
 String ssid = "";
 String password = "";
-String gemini_key = "";
+String gemini_key = "AIzaSyCZUT8T19IWGrcWI0DA1wwnryDGH85fr3A";
 
 String userInput = "";
 bool isProcessing = false;
@@ -63,9 +63,11 @@ String readInput(String prompt, bool isPassword = false) {
 
 void setupCredentials() {
     preferences.begin("aichat", false);
-    ssid = preferences.getString("ssid", "");
-    password = preferences.getString("password", "");
-    gemini_key = preferences.getString("gemini_key", "");
+
+    // Only load from preferences if global variables are empty (not hardcoded)
+    if (ssid == "") ssid = preferences.getString("ssid", "");
+    if (password == "") password = preferences.getString("password", "");
+    if (gemini_key == "") gemini_key = preferences.getString("gemini_key", "");
 
     M5Cardputer.Display.fillScreen(BLACK);
     M5Cardputer.Display.setCursor(0, 0);
@@ -86,13 +88,26 @@ void setupCredentials() {
         delay(10);
     }
 
-    if (ssid == "" || gemini_key == "" || resetConfig) {
-        ssid = readInput("Enter WiFi SSID:");
-        password = readInput("Enter WiFi PASS:");
-        gemini_key = readInput("Gemini API Key:", true);
+    if (resetConfig) {
+        // If user wants to reset, clear the global variables and ask again
+        ssid = "";
+        password = "";
+        gemini_key = "";
+    }
 
+    // Ask individually so if only one is missing, it doesn't prompt for all
+    if (ssid == "") {
+        ssid = readInput("Enter WiFi SSID:");
         preferences.putString("ssid", ssid);
+    }
+
+    if (password == "") {
+        password = readInput("Enter WiFi PASS:");
         preferences.putString("password", password);
+    }
+
+    if (gemini_key == "") {
+        gemini_key = readInput("Gemini API Key:", true);
         preferences.putString("gemini_key", gemini_key);
     }
 }
@@ -233,6 +248,7 @@ void setup() {
     auto cfg = M5.config();
     M5Cardputer.begin(cfg, true);
     M5Cardputer.Display.setRotation(1);
+    M5Cardputer.Display.setTextSize(2);
     M5.Speaker.setVolume(200);
 
     setupCredentials();
