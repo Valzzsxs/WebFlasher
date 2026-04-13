@@ -12,7 +12,7 @@
 Preferences preferences;
 String ssid = "";
 String password = "";
-String gemini_key = "AIzaSyCZUT8T19IWGrcWI0DA1wwnryDGH85fr3A";
+String gemini_key = "AIzaSyBrPepWCbNpDyDjpHwHTUvuG8teB5CPdvY";
 
 String userInput = "";
 bool isProcessing = false;
