@@ -1,19 +1,26 @@
 #include <M5Cardputer.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
-#include <SPIFFS.h>
+
+#include <AudioGeneratorMP3.h>
+#include <AudioOutputI2S.h>
+#include <AudioFileSourceHTTPStream.h>
 
 Preferences preferences;
 String ssid = "";
 String password = "";
-String openai_key = "";
+String gemini_key = "";
 
 String userInput = "";
 bool isProcessing = false;
 
-// Function to handle keyboard input
+AudioGeneratorMP3 *mp3;
+AudioFileSourceHTTPStream *file;
+AudioOutputI2S *out;
+
 String readInput(String prompt, bool isPassword = false) {
     String input = "";
     M5Cardputer.Display.fillScreen(BLACK);
@@ -37,7 +44,6 @@ String readInput(String prompt, bool isPassword = false) {
                 }
             }
 
-            // Redraw
             M5Cardputer.Display.fillScreen(BLACK);
             M5Cardputer.Display.setCursor(0, 0);
             M5Cardputer.Display.setTextColor(GREEN);
@@ -59,7 +65,7 @@ void setupCredentials() {
     preferences.begin("aichat", false);
     ssid = preferences.getString("ssid", "");
     password = preferences.getString("password", "");
-    openai_key = preferences.getString("openai_key", "");
+    gemini_key = preferences.getString("gemini_key", "");
 
     M5Cardputer.Display.fillScreen(BLACK);
     M5Cardputer.Display.setCursor(0, 0);
@@ -80,14 +86,14 @@ void setupCredentials() {
         delay(10);
     }
 
-    if (ssid == "" || openai_key == "" || resetConfig) {
+    if (ssid == "" || gemini_key == "" || resetConfig) {
         ssid = readInput("Enter WiFi SSID:");
         password = readInput("Enter WiFi PASS:");
-        openai_key = readInput("OpenAI API Key:", true);
+        gemini_key = readInput("Gemini API Key:", true);
 
         preferences.putString("ssid", ssid);
         preferences.putString("password", password);
-        preferences.putString("openai_key", openai_key);
+        preferences.putString("gemini_key", gemini_key);
     }
 }
 
@@ -115,18 +121,24 @@ void connectWiFi() {
     delay(1000);
 }
 
-String queryChatAPI(String text) {
+String queryGeminiAPI(String text) {
+    WiFiClientSecure *client = new WiFiClientSecure;
+    if(client) {
+        client->setInsecure(); // Disable SSL certificate verification for simplicity
+    }
+
     HTTPClient http;
-    http.begin("https://api.openai.com/v1/chat/completions");
+    String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + gemini_key;
+    http.begin(*client, url);
     http.addHeader("Content-Type", "application/json");
-    http.addHeader("Authorization", "Bearer " + openai_key);
 
     JsonDocument doc;
-    doc["model"] = "gpt-3.5-turbo";
-    JsonArray messages = doc["messages"].to<JsonArray>();
-    JsonObject msg = messages.add<JsonObject>();
-    msg["role"] = "user";
-    msg["content"] = text;
+    JsonArray contents = doc["contents"].to<JsonArray>();
+    JsonObject part = contents.add<JsonObject>();
+    JsonArray parts = part["parts"].to<JsonArray>();
+    JsonObject textObj = parts.add<JsonObject>();
+
+    textObj["text"] = "Jawab dalam bahasa Indonesia, maksimal 2 kalimat pendek dan lugas: " + text;
 
     String requestBody;
     serializeJson(doc, requestBody);
@@ -138,78 +150,81 @@ String queryChatAPI(String text) {
         String response = http.getString();
         JsonDocument resDoc;
         deserializeJson(resDoc, response);
-        const char* content = resDoc["choices"][0]["message"]["content"];
+        const char* content = resDoc["candidates"][0]["content"]["parts"][0]["text"];
         responseText = String(content);
+        responseText.trim();
     } else {
         responseText = "API Error: " + String(httpResponseCode);
-        String errorMsg = http.getString();
-        Serial.println(errorMsg);
-    }
-    http.end();
-    return responseText;
-}
-
-void playTTS(String text) {
-    M5Cardputer.Display.fillScreen(BLACK);
-    M5Cardputer.Display.setCursor(0, 0);
-    M5Cardputer.Display.setTextColor(CYAN);
-    M5Cardputer.Display.println("Downloading TTS...");
-
-    HTTPClient http;
-    http.begin("https://api.openai.com/v1/audio/speech");
-    http.addHeader("Content-Type", "application/json");
-    http.addHeader("Authorization", "Bearer " + openai_key);
-
-    JsonDocument doc;
-    doc["model"] = "tts-1";
-    doc["input"] = text;
-    doc["voice"] = "alloy";
-    doc["response_format"] = "wav";
-
-    String requestBody;
-    serializeJson(doc, requestBody);
-
-    int httpResponseCode = http.POST(requestBody);
-    if (httpResponseCode == 200) {
-        File file = SPIFFS.open("/tts.wav", FILE_WRITE);
-        if (!file) {
-            M5Cardputer.Display.println("Failed to open file");
-            return;
-        }
-        http.writeToStream(&file);
-        file.close();
-
-        M5Cardputer.Display.println("Playing audio...");
-        M5.Speaker.setVolume(200);
-        File readFile = SPIFFS.open("/tts.wav", FILE_READ);
-        if (readFile) {
-            size_t fileSize = readFile.size();
-            uint8_t *buffer = (uint8_t*)malloc(fileSize);
-            if (buffer) {
-                readFile.read(buffer, fileSize);
-                // Simple playWav (M5Unified supports this)
-                M5.Speaker.playWav(buffer, fileSize);
-                while(M5.Speaker.isPlaying()) {
-                    delay(10);
-                }
-                free(buffer);
-            } else {
-                M5Cardputer.Display.println("Not enough RAM");
-            }
-            readFile.close();
-        }
-    } else {
-        M5Cardputer.Display.println("TTS Error: " + String(httpResponseCode));
         Serial.println(http.getString());
     }
     http.end();
+    delete client;
+    return responseText;
+}
+
+String urlEncode(String str) {
+    String encodedString = "";
+    char c;
+    char code0;
+    char code1;
+    for (int i =0; i < str.length(); i++){
+      c=str.charAt(i);
+      if (c == ' '){
+        encodedString+= '+';
+      } else if (isalnum(c)){
+        encodedString+=c;
+      } else{
+        code1=(c & 0xf)+'0';
+        if ((c & 0xf) >9){
+            code1=(c & 0xf) - 10 + 'A';
+        }
+        c=(c>>4)&0xf;
+        code0=c+'0';
+        if (c > 9){
+            code0=c - 10 + 'A';
+        }
+        encodedString+='%';
+        encodedString+=code0;
+        encodedString+=code1;
+      }
+    }
+    return encodedString;
+}
+
+void playTTS(String text) {
+    if (text.length() > 200) {
+        text = text.substring(0, 200);
+    }
+    String encodedText = urlEncode(text);
+    // Use https for google translate as it redirects http to https anyway.
+    // However, AudioFileSourceHTTPStream handles redirects but needs https for it to work.
+    String url = "https://translate.google.com/translate_tts?ie=UTF-8&tl=id&client=tw-ob&q=" + encodedText;
+
+    audioLogger = &Serial;
+    // ESP8266Audio AudioFileSourceHTTPStream doesn't support HTTPS out of the box unless configured?
+    // Wait, AudioFileSourcePROGMEM or AudioFileSourceHTTPStream handles HTTPS internally in ESP8266Audio if URL starts with https.
+    // ESP8266Audio uses WiFiClientSecure internally if url starts with "https://".
+    file = new AudioFileSourceHTTPStream(url.c_str());
+    out = new AudioOutputI2S(0, 1);
+    out->SetPinout(41, 43, 42); // Cardputer I2S pins for ES8311
+    mp3 = new AudioGeneratorMP3();
+
+    mp3->begin(file, out);
+
+    while(mp3->isRunning()) {
+        if (!mp3->loop()) mp3->stop();
+    }
+
+    delete file;
+    delete out;
+    delete mp3;
 }
 
 void drawUI() {
     M5Cardputer.Display.fillScreen(BLACK);
     M5Cardputer.Display.setCursor(0, 0);
     M5Cardputer.Display.setTextColor(GREEN);
-    M5Cardputer.Display.println("--- AI Chat ---");
+    M5Cardputer.Display.println("--- Gemini Chat ---");
     M5Cardputer.Display.setTextColor(WHITE);
     M5Cardputer.Display.println(userInput);
 }
@@ -218,10 +233,7 @@ void setup() {
     auto cfg = M5.config();
     M5Cardputer.begin(cfg, true);
     M5Cardputer.Display.setRotation(1);
-
-    if(!SPIFFS.begin(true)){
-        Serial.println("SPIFFS Mount Failed");
-    }
+    M5.Speaker.setVolume(200);
 
     setupCredentials();
     connectWiFi();
@@ -239,16 +251,19 @@ void loop() {
                 M5Cardputer.Display.setTextColor(YELLOW);
                 M5Cardputer.Display.println("Thinking...");
 
-                String answer = queryChatAPI(userInput);
+                String answer = queryGeminiAPI(userInput);
 
                 M5Cardputer.Display.fillScreen(BLACK);
                 M5Cardputer.Display.setCursor(0, 0);
                 M5Cardputer.Display.setTextColor(CYAN);
-                M5Cardputer.Display.println("AI:");
+                M5Cardputer.Display.println("Gemini:");
                 M5Cardputer.Display.setTextColor(WHITE);
                 M5Cardputer.Display.println(answer);
 
+                // Pause M5 Speaker output briefly so I2S takes over
+                M5.Speaker.end();
                 playTTS(answer);
+                M5.Speaker.begin();
 
                 delay(3000);
                 userInput = "";
